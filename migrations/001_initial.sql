@@ -1,0 +1,11 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE TABLE IF NOT EXISTS tenants(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS users(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE, name text NOT NULL, email text NOT NULL UNIQUE, password_hash text NOT NULL, role text NOT NULL CHECK(role IN ('owner','admin','manager','staff')), created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS records(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE, resource text NOT NULL CHECK(resource IN ('customers','products','orders','payments','inventory','employees','operations')), data jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS records_tenant_resource_idx ON records(tenant_id,resource,created_at DESC);
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS users_tenant_isolation ON users;
+CREATE POLICY users_tenant_isolation ON users USING (tenant_id::text = current_setting('app.tenant_id', true)) WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true));
+DROP POLICY IF EXISTS records_tenant_isolation ON records;
+CREATE POLICY records_tenant_isolation ON records USING (tenant_id::text = current_setting('app.tenant_id', true)) WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true));
